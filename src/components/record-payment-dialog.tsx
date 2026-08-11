@@ -1,0 +1,131 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { formatCents, toCents } from "@/lib/format";
+
+export function RecordPaymentDialog({
+  orderId,
+  dueCents,
+}: {
+  orderId: string;
+  dueCents: number;
+}) {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [pending, setPending] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const amountCents = toCents(String(form.get("amount")));
+
+    if (amountCents === null || amountCents < 1) {
+      setError("Enter an amount greater than zero.");
+      return;
+    }
+
+    setPending(true);
+    setError("");
+
+    const response = await fetch(`/api/orders/${orderId}/payments`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        amountCents,
+        paidAt: String(form.get("paidAt")) || undefined,
+        note: String(form.get("note")) || undefined,
+      }),
+    });
+
+    const body = await response.json();
+    setPending(false);
+
+    if (!response.ok) {
+      const max = body.error?.details?.maxAllowedCents;
+      setError(
+        max === undefined
+          ? (body.error?.message ?? "Could not record that payment.")
+          : `${body.error.message} The most you can record is ${formatCents(max)}.`,
+      );
+      return;
+    }
+
+    setOpen(false);
+    toast.success(`Recorded ${formatCents(amountCents)}`);
+    router.refresh();
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={<Button disabled={dueCents === 0}>Record payment</Button>}
+      />
+      <DialogContent>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Record payment</DialogTitle>
+            <DialogDescription>
+              {formatCents(dueCents)} is still due on this order.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <Field>
+              <FieldLabel htmlFor="amount">Amount</FieldLabel>
+              <Input
+                id="amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                max={(dueCents / 100).toFixed(2)}
+                required
+                autoFocus
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="paidAt">Date paid</FieldLabel>
+              <Input
+                id="paidAt"
+                name="paidAt"
+                type="date"
+                defaultValue={new Date().toISOString().slice(0, 10)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="note">Note</FieldLabel>
+              <Input id="note" name="note" placeholder="Optional" />
+            </Field>
+            {error ? (
+              <FieldDescription className="text-destructive">
+                {error}
+              </FieldDescription>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Recording…" : "Record payment"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
