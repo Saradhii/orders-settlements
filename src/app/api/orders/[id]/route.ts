@@ -1,10 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { parseBody, requireUserId, route } from "@/server/api/request";
+import { listPayments } from "@/server/orders/payments";
 import {
   deleteOrder,
   getOrder,
-  listPayments,
   updateOrder,
 } from "@/server/orders/repository";
 import { updateOrderSchema } from "@/server/orders/schema";

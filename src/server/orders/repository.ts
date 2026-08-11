@@ -1,13 +1,13 @@
 import { ObjectId } from "mongodb";
 
 import { ApiError } from "@/server/api/errors";
-import { orders, payments, type OrderDoc } from "@/server/db/collections";
+import { orders, type OrderDoc } from "@/server/db/collections";
 
 import { statusFilter, subtotalCents } from "./domain";
 import type { CreateOrderInput, UpdateOrderInput } from "./schema";
 import type { OrderStatus } from "./types";
 
-function notFound() {
+export function notFound() {
   return new ApiError(404, "ORDER_NOT_FOUND", "That order does not exist.");
 }
 
@@ -31,10 +31,6 @@ export async function getOrder(userId: string, id: string) {
   if (!order) throw notFound();
 
   return order;
-}
-
-export async function listPayments(orderId: ObjectId) {
-  return payments.find({ orderId }).sort({ createdAt: 1 }).toArray();
 }
 
 export async function createOrder(userId: string, input: CreateOrderInput) {
