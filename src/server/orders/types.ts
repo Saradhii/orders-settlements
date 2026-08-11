@@ -4,17 +4,17 @@ export type LineItem = {
   unitPriceCents: number;
 };
 
-export type OrderStatus = "pending" | "partially_paid" | "paid" | "overdue";
+export const ORDER_STATUSES = [
+  "pending",
+  "partially_paid",
+  "paid",
+  "overdue",
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export type StatusInput = {
   paidCents: number;
   dueCents: number;
   dueDate: Date;
 };
-
-export const ORDER_STATUSES: OrderStatus[] = [
-  "pending",
-  "partially_paid",
-  "paid",
-  "overdue",
-];
