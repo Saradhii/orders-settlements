@@ -1,9 +1,9 @@
 import { headers } from "next/headers";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
 import { OrderLineItems } from "@/components/order-line-items";
+import { PageBreadcrumb } from "@/components/page-breadcrumb";
 import { PaymentHistory } from "@/components/payment-history";
 import { RecordPaymentDialog } from "@/components/record-payment-dialog";
 import { StatusBadge } from "@/components/status-badge";
@@ -41,12 +41,7 @@ export default async function OrderDetailPage({
       <AppHeader email={session.user.email} />
       <main className="mx-auto w-full max-w-4xl space-y-8 px-6 py-8">
         <div>
-          <Link
-            href="/orders"
-            className="text-muted-foreground text-sm hover:underline"
-          >
-            ← All orders
-          </Link>
+          <PageBreadcrumb page={order.customer} />
           <div className="mt-2 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <h1 className="text-xl font-semibold">{order.customer}</h1>

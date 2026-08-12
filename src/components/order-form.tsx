@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { DatePicker } from "@/components/date-picker";
 import {
   EMPTY_ROW,
   LineItemsEditor,
@@ -12,11 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { formatCents, toCents } from "@/lib/format";
+import { Spinner } from "@/components/ui/spinner";
+import { formatCents, toCents, toDateInput } from "@/lib/format";
 
 export function OrderForm() {
   const router = useRouter();
   const [rows, setRows] = useState<Row[]>([{ ...EMPTY_ROW }]);
+  const [dueDate, setDueDate] = useState<Date>();
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -26,6 +29,11 @@ export function OrderForm() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
 
+    if (!dueDate) {
+      setError("Pick a due date.");
+      return;
+    }
+
     setPending(true);
     setError("");
 
@@ -34,7 +42,7 @@ export function OrderForm() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         customer: String(form.get("customer")),
-        dueDate: String(form.get("dueDate")),
+        dueDate: toDateInput(dueDate),
         lineItems: rows.map((row) => ({
           description: row.description,
           quantity: Number(row.quantity),
@@ -68,7 +76,7 @@ export function OrderForm() {
         </Field>
         <Field>
           <FieldLabel htmlFor="dueDate">Due date</FieldLabel>
-          <Input id="dueDate" name="dueDate" type="date" required />
+          <DatePicker id="dueDate" value={dueDate} onChange={setDueDate} />
         </Field>
       </div>
 
@@ -88,6 +96,7 @@ export function OrderForm() {
           Cancel
         </Button>
         <Button type="submit" disabled={pending}>
+          {pending ? <Spinner /> : null}
           {pending ? "Creating…" : "Create order"}
         </Button>
       </div>

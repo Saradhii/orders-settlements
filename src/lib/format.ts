@@ -14,6 +14,13 @@ export function formatDate(value: string | Date) {
   });
 }
 
+export function toDateInput(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
 export function toCents(value: string) {
   const amount = Number(value);
 

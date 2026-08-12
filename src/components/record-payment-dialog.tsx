@@ -16,7 +16,9 @@ import {
 } from "@/components/ui/dialog";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { formatCents, toCents } from "@/lib/format";
+import { Spinner } from "@/components/ui/spinner";
+import { DatePicker } from "@/components/date-picker";
+import { formatCents, toCents, toDateInput } from "@/lib/format";
 
 export function RecordPaymentDialog({
   orderId,
@@ -27,6 +29,7 @@ export function RecordPaymentDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [paidAt, setPaidAt] = useState<Date | undefined>(() => new Date());
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -48,7 +51,7 @@ export function RecordPaymentDialog({
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         amountCents,
-        paidAt: String(form.get("paidAt")) || undefined,
+        paidAt: paidAt ? toDateInput(paidAt) : undefined,
         note: String(form.get("note")) || undefined,
       }),
     });
@@ -101,12 +104,7 @@ export function RecordPaymentDialog({
             </Field>
             <Field>
               <FieldLabel htmlFor="paidAt">Date paid</FieldLabel>
-              <Input
-                id="paidAt"
-                name="paidAt"
-                type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
-              />
+              <DatePicker id="paidAt" value={paidAt} onChange={setPaidAt} />
             </Field>
             <Field>
               <FieldLabel htmlFor="note">Note</FieldLabel>
@@ -121,6 +119,7 @@ export function RecordPaymentDialog({
 
           <DialogFooter>
             <Button type="submit" disabled={pending}>
+              {pending ? <Spinner /> : null}
               {pending ? "Recording…" : "Record payment"}
             </Button>
           </DialogFooter>
