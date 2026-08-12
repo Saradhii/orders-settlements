@@ -22,9 +22,13 @@ export function toDateInput(date: Date) {
 }
 
 export function toCents(value: string) {
-  const amount = Number(value);
+  const match = value.trim().match(/^(\d*)(?:\.(\d{1,2}))?$/);
 
-  if (!value.trim() || !Number.isFinite(amount)) return null;
+  if (!match) return null;
 
-  return Math.round(amount * 100);
+  const [, whole, fraction = ""] = match;
+
+  if (!whole && !fraction) return null;
+
+  return Number(whole || 0) * 100 + Number(fraction.padEnd(2, "0"));
 }

@@ -18,6 +18,7 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { DatePicker } from "@/components/date-picker";
+import { MoneyInput } from "@/components/money-input";
 import { formatCents, toCents, toDateInput } from "@/lib/format";
 
 export function RecordPaymentDialog({
@@ -29,6 +30,7 @@ export function RecordPaymentDialog({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState("");
   const [paidAt, setPaidAt] = useState<Date | undefined>(() => new Date());
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -36,7 +38,7 @@ export function RecordPaymentDialog({
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const amountCents = toCents(String(form.get("amount")));
+    const amountCents = toCents(amount);
 
     if (amountCents === null || amountCents < 1) {
       setError("Enter an amount greater than zero.");
@@ -70,6 +72,7 @@ export function RecordPaymentDialog({
     }
 
     setOpen(false);
+    setAmount("");
     toast.success(`Recorded ${formatCents(amountCents)}`);
     router.refresh();
   }
@@ -91,13 +94,11 @@ export function RecordPaymentDialog({
           <div className="grid gap-4 py-4">
             <Field>
               <FieldLabel htmlFor="amount">Amount</FieldLabel>
-              <Input
+              <MoneyInput
                 id="amount"
-                name="amount"
-                type="number"
-                step="0.01"
-                min="0.01"
-                max={(dueCents / 100).toFixed(2)}
+                value={amount}
+                onChange={setAmount}
+                placeholder={formatCents(dueCents)}
                 required
                 autoFocus
               />

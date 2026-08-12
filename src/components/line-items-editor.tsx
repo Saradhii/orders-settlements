@@ -1,5 +1,6 @@
 "use client";
 
+import { MoneyInput, QuantityInput } from "@/components/money-input";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -71,24 +72,18 @@ export function LineItemsEditor({
                   />
                 </TableCell>
                 <TableCell>
-                  <Input
+                  <QuantityInput
                     aria-label={`Line ${index + 1} quantity`}
-                    type="number"
-                    min="1"
-                    step="1"
                     value={row.quantity}
-                    onChange={(e) => update(index, { quantity: e.target.value })}
+                    onChange={(quantity) => update(index, { quantity })}
                     required
                   />
                 </TableCell>
                 <TableCell>
-                  <Input
+                  <MoneyInput
                     aria-label={`Line ${index + 1} unit price`}
-                    type="number"
-                    min="0"
-                    step="0.01"
                     value={row.unitPrice}
-                    onChange={(e) => update(index, { unitPrice: e.target.value })}
+                    onChange={(unitPrice) => update(index, { unitPrice })}
                     required
                   />
                 </TableCell>
