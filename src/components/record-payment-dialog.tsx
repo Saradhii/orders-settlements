@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,7 @@ export function RecordPaymentDialog({
   const [paidAt, setPaidAt] = useState<Date | undefined>(() => new Date());
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const idempotencyKey = useRef("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -45,12 +46,17 @@ export function RecordPaymentDialog({
       return;
     }
 
+    if (!idempotencyKey.current) idempotencyKey.current = crypto.randomUUID();
+
     setPending(true);
     setError("");
 
     const response = await fetch(`/api/orders/${orderId}/payments`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "idempotency-key": idempotencyKey.current,
+      },
       body: JSON.stringify({
         amountCents,
         paidAt: paidAt ? toDateInput(paidAt) : undefined,
@@ -71,6 +77,7 @@ export function RecordPaymentDialog({
       return;
     }
 
+    idempotencyKey.current = "";
     setOpen(false);
     setAmount("");
     toast.success(`Recorded ${formatCents(amountCents)}`);

@@ -1,12 +1,15 @@
 import { headers } from "next/headers";
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { AppHeader } from "@/components/app-header";
+import { DeleteOrderDialog } from "@/components/delete-order-dialog";
 import { OrderLineItems } from "@/components/order-line-items";
 import { PageBreadcrumb } from "@/components/page-breadcrumb";
 import { PaymentHistory } from "@/components/payment-history";
 import { RecordPaymentDialog } from "@/components/record-payment-dialog";
 import { StatusBadge } from "@/components/status-badge";
+import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
 import { formatCents, formatDate } from "@/lib/format";
 import { listPayments } from "@/server/orders/payments";
@@ -47,7 +50,21 @@ export default async function OrderDetailPage({
               <h1 className="text-xl font-semibold">{order.customer}</h1>
               <StatusBadge status={order.status} />
             </div>
-            <RecordPaymentDialog orderId={order.id} dueCents={order.dueCents} />
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                render={<Link href={`/orders/${order.id}/edit`}>Edit</Link>}
+              />
+              <DeleteOrderDialog
+                orderId={order.id}
+                customer={order.customer}
+                paidCents={order.paidCents}
+              />
+              <RecordPaymentDialog
+                orderId={order.id}
+                dueCents={order.dueCents}
+              />
+            </div>
           </div>
         </div>
 

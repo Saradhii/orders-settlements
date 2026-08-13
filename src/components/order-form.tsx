@@ -15,11 +15,24 @@ import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { formatCents, toCents, toDateInput } from "@/lib/format";
+import type { OrderResponse } from "@/server/orders/serialize";
 
-export function OrderForm() {
+function toRows(order: OrderResponse): Row[] {
+  return order.lineItems.map((item) => ({
+    description: item.description,
+    quantity: String(item.quantity),
+    unitPrice: (item.unitPriceCents / 100).toFixed(2),
+  }));
+}
+
+export function OrderForm({ order }: { order?: OrderResponse }) {
   const router = useRouter();
-  const [rows, setRows] = useState<Row[]>([{ ...EMPTY_ROW }]);
-  const [dueDate, setDueDate] = useState<Date>();
+  const [rows, setRows] = useState<Row[]>(() =>
+    order ? toRows(order) : [{ ...EMPTY_ROW }],
+  );
+  const [dueDate, setDueDate] = useState<Date | undefined>(() =>
+    order ? new Date(order.dueDate) : undefined,
+  );
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
 
@@ -34,22 +47,32 @@ export function OrderForm() {
       return;
     }
 
+    if (order && subtotal < order.paidCents) {
+      setError(
+        `This order already has ${formatCents(order.paidCents)} paid against it. The total cannot go below that.`,
+      );
+      return;
+    }
+
     setPending(true);
     setError("");
 
-    const response = await fetch("/api/orders", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        customer: String(form.get("customer")),
-        dueDate: toDateInput(dueDate),
-        lineItems: rows.map((row) => ({
-          description: row.description,
-          quantity: Number(row.quantity),
-          unitPriceCents: toCents(row.unitPrice) ?? 0,
-        })),
-      }),
-    });
+    const response = await fetch(
+      order ? `/api/orders/${order.id}` : "/api/orders",
+      {
+        method: order ? "PATCH" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          customer: String(form.get("customer")),
+          dueDate: toDateInput(dueDate),
+          lineItems: rows.map((row) => ({
+            description: row.description,
+            quantity: Number(row.quantity),
+            unitPriceCents: toCents(row.unitPrice) ?? 0,
+          })),
+        }),
+      },
+    );
 
     const body = await response.json();
 
@@ -59,12 +82,13 @@ export function OrderForm() {
       setError(
         fields?.length
           ? fields.map((f: { message: string }) => f.message).join(" ")
-          : (body.error?.message ?? "Could not create that order."),
+          : (body.error?.message ?? "Could not save that order."),
       );
       return;
     }
 
     router.push(`/orders/${body.order.id}`);
+    router.refresh();
   }
 
   return (
@@ -72,7 +96,13 @@ export function OrderForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <Field>
           <FieldLabel htmlFor="customer">Customer</FieldLabel>
-          <Input id="customer" name="customer" required autoFocus />
+          <Input
+            id="customer"
+            name="customer"
+            defaultValue={order?.customer}
+            required
+            autoFocus
+          />
         </Field>
         <Field>
           <FieldLabel htmlFor="dueDate">Due date</FieldLabel>
@@ -87,6 +117,12 @@ export function OrderForm() {
         <span className="font-medium tabular-nums">{formatCents(subtotal)}</span>
       </p>
 
+      {order && order.paidCents > 0 ? (
+        <FieldDescription className="text-right">
+          {formatCents(order.paidCents)} has already been paid on this order.
+        </FieldDescription>
+      ) : null}
+
       {error ? (
         <FieldDescription className="text-destructive">{error}</FieldDescription>
       ) : null}
@@ -97,7 +133,13 @@ export function OrderForm() {
         </Button>
         <Button type="submit" disabled={pending}>
           {pending ? <Spinner /> : null}
-          {pending ? "Creating…" : "Create order"}
+          {pending
+            ? order
+              ? "Saving…"
+              : "Creating…"
+            : order
+              ? "Save changes"
+              : "Create order"}
         </Button>
       </div>
     </form>
