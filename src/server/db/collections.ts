@@ -25,6 +25,7 @@ export type PaymentDoc = {
   amountCents: number;
   paidAt: Date;
   note?: string;
+  idempotencyKey?: string;
   createdAt: Date;
 };
 

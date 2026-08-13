@@ -10,7 +10,8 @@ declare global {
   var __mongoClient: MongoClient | undefined;
 }
 
-export const client = globalThis.__mongoClient ?? new MongoClient(uri);
+export const client =
+  globalThis.__mongoClient ?? new MongoClient(uri, { ignoreUndefined: true });
 
 if (process.env.NODE_ENV !== "production") globalThis.__mongoClient = client;
 

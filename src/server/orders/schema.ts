@@ -56,6 +56,13 @@ export const recordPaymentSchema = z.object({
   note: z.string().trim().max(500, "Keep notes under 500 characters.").optional(),
 });
 
+export const idempotencyKeySchema = z
+  .string()
+  .trim()
+  .min(1, "Idempotency-Key cannot be empty.")
+  .max(200, "Keep Idempotency-Key under 200 characters.")
+  .optional();
+
 export const listOrdersQuerySchema = z.object({
   status: z.enum(ORDER_STATUSES, {
     error: `Status must be one of: ${ORDER_STATUSES.join(", ")}.`,

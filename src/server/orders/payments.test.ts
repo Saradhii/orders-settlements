@@ -1,5 +1,5 @@
 import { ObjectId } from "mongodb";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ApiError } from "@/server/api/errors";
 
@@ -16,6 +16,7 @@ const NEW_ORDER = {
 describe.skipIf(!hasDatabase)("recordPayment", async () => {
   const { client } = await import("@/server/db/client");
   const { orders, payments } = await import("@/server/db/collections");
+  const { ensureIndexes } = await import("@/server/db/indexes");
   const { createOrder } = await import("./repository");
   const { recordPayment } = await import("./payments");
 
@@ -47,6 +48,7 @@ describe.skipIf(!hasDatabase)("recordPayment", async () => {
     return { order, history };
   }
 
+  beforeAll(ensureIndexes);
   beforeEach(clear);
 
   afterAll(async () => {
@@ -125,6 +127,83 @@ describe.skipIf(!hasDatabase)("recordPayment", async () => {
     expect(history.reduce((sum, p) => sum + p.amountCents, 0)).toBe(
       order?.paidCents,
     );
+  });
+
+  it("records a replayed idempotency key only once", async () => {
+    const id = await seedOrder(0);
+
+    const first = await recordPayment(
+      USER_ID,
+      id.toString(),
+      { amountCents: 40000 },
+      "key-1",
+    );
+
+    const second = await recordPayment(
+      USER_ID,
+      id.toString(),
+      { amountCents: 40000 },
+      "key-1",
+    );
+
+    expect(first.replayed).toBe(false);
+    expect(second.replayed).toBe(true);
+    expect(second.payment._id).toEqual(first.payment._id);
+
+    const { order, history } = await reload(id);
+
+    expect(order?.paidCents).toBe(40000);
+    expect(history).toHaveLength(1);
+  });
+
+  it("collapses simultaneous retries of one idempotency key into one payment", async () => {
+    const id = await seedOrder(0);
+
+    const attempts = await Promise.all(
+      Array.from({ length: 8 }, () =>
+        recordPayment(
+          USER_ID,
+          id.toString(),
+          { amountCents: 25000 },
+          "key-2",
+        ),
+      ),
+    );
+
+    const ids = new Set(attempts.map((a) => a.payment._id.toString()));
+
+    expect(ids.size).toBe(1);
+
+    const { order, history } = await reload(id);
+
+    expect(order?.paidCents).toBe(25000);
+    expect(history).toHaveLength(1);
+  });
+
+  it("refuses to reuse an idempotency key for a different amount", async () => {
+    const id = await seedOrder(0);
+
+    await recordPayment(
+      USER_ID,
+      id.toString(),
+      { amountCents: 40000 },
+      "key-3",
+    );
+
+    const error = await recordPayment(
+      USER_ID,
+      id.toString(),
+      { amountCents: 50000 },
+      "key-3",
+    ).catch((caught) => caught);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.code).toBe("IDEMPOTENCY_KEY_REUSED");
+
+    const { order, history } = await reload(id);
+
+    expect(order?.paidCents).toBe(40000);
+    expect(history).toHaveLength(1);
   });
 
   it("never lets concurrent payments exceed the order total", async () => {
