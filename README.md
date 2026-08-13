@@ -4,13 +4,13 @@ Create orders with line items, record full or partial payments against them, and
 
 Live: https://orders-settlements-weld.vercel.app
 
-Demo account: `demo@example.com` / `demo12345` — sign in at https://orders-settlements-weld.vercel.app/login
+Demo account is `demo@example.com` / `demo12345`. Sign in at https://orders-settlements-weld.vercel.app/login
 
 Next.js (App Router) and TypeScript, MongoDB via the native driver, Better Auth for email/password, Zod for validation, Tailwind and shadcn/ui, Vitest for tests.
 
 ## Setup
 
-Needs Node 20+ and a MongoDB replica set — payments are written in a transaction, so a standalone `mongod` won't work. Atlas free tier is fine.
+You need Node 20+ and a MongoDB replica set. Payments are written inside a transaction, so a standalone `mongod` won't work. Atlas free tier is fine.
 
     cp .env.example .env.local   # fill in MONGODB_URI, MONGODB_DB, BETTER_AUTH_SECRET
     npm install
@@ -43,46 +43,48 @@ Money is integer cents everywhere, so there is nothing to round. Errors share on
       }
     }
 
-Validation failures are 422 with a `fields` array. Over-payment, editing an order below what's already paid, and deleting an order that has payments are 409s with the numbers needed to fix the request.
+Validation failures are 422 with a `fields` array. Over-payment, editing an order below what's already paid, and deleting an order that has payments are all 409s, with the numbers you need to fix the request.
 
 ## Status
 
-Derived on every read from the amount due and the due date, never stored:
+Status is derived on every read from the amount due and the due date. It is never stored.
 
 - `paid` when nothing is due
 - `overdue` when something is due and the due date has passed
 - `pending` when nothing has been paid
 - `partially_paid` otherwise
 
-Edge cases: an order that went overdue and was then paid in full shows as `paid` — overdue is a view of late unpaid work, not a state you get stuck in. Overdue isn't persisted because it depends on the current time and would go stale between cron runs. An order due exactly now isn't overdue yet.
+A few edge cases. An order that went overdue and was then paid in full shows as `paid`, since overdue is really just a view of late unpaid work rather than a state an order gets stuck in. Overdue isn't persisted because it depends on the current time, so storing it would need a cron job and would go stale between runs. An order due exactly now isn't overdue yet.
 
-Orders stay editable after the first payment, since names and line items genuinely need correcting after money arrives. You just can't drop the total below what's already been paid, and you can't delete an order that has payments.
+Orders stay editable after the first payment. Names and line items genuinely need correcting after money has arrived, so freezing them felt wrong. What you can't do is drop the total below what has already been paid, or delete an order that has payments against it.
 
 ## Concurrency
 
-Recording a payment is one conditional update — the order only changes if it still has enough due to cover the amount:
+Recording a payment is one conditional update. The order only changes if it still has enough due to cover the amount:
 
     { _id, userId, dueCents: { $gte: amountCents } }
 
-with `$inc` on the paid and due totals. There's no read-then-write window to lose. If the condition doesn't match, the payment lost the race and the error reports what's actually still due. The update and the payment insert share a transaction, so a rejected payment leaves nothing behind.
+with `$inc` on the paid and due totals. There is no read-then-write window to lose. If the condition doesn't match, the payment lost the race, and the error reports what is actually still due. The update and the payment insert share a transaction, so a rejected payment leaves nothing behind.
 
-`POST /api/orders/:id/payments` also takes an `Idempotency-Key` header. A unique index on `{ orderId, idempotencyKey }` makes a replay return the original payment with a 200 instead of recording a second one. The payment dialog sends a key per attempt and keeps it across retries, so a double-click can't double-charge.
+`POST /api/orders/:id/payments` also takes an `Idempotency-Key` header. A unique index on `{ orderId, idempotencyKey }` means a replay returns the original payment with a 200 instead of recording a second one. The payment dialog sends a key per attempt and keeps it across retries, so a double-click can't double-charge.
 
-Tested against a real database: ten simultaneous payments competing for the last slot (one wins), twelve overlapping payments that must never exceed the total, and eight concurrent retries of one key collapsing into a single payment.
+All of this is tested against a real database: ten simultaneous payments competing for the last slot where exactly one wins, twelve overlapping payments that must never exceed the total, and eight concurrent retries of one key collapsing into a single payment.
 
 ## Indexes
 
     orders    { userId: 1, dueDate: 1 }               list, sorted by due date
     orders    { userId: 1, dueCents: 1, dueDate: 1 }  status filters
     payments  { orderId: 1, createdAt: 1 }            payment history
-    payments  { orderId: 1, idempotencyKey: 1 }       unique, partial — idempotency
+    payments  { orderId: 1, idempotencyKey: 1 }       unique, partial, for idempotency
 
-Every index leads with the tenancy key. Paid and due totals are denormalised onto the order so status filters stay indexable and the list view doesn't fan out per order; payments remain the record of truth, and the tests assert the two always agree.
+Every index leads with the tenancy key. Paid and due totals are denormalised onto the order so the status filters stay indexable and the list view doesn't fan out one query per order. Payments are still the record of truth, and the tests assert the two always agree.
 
 ## Assumptions
 
-Order total is just the subtotal — no tax, discounts or currencies beyond USD. Line items live on the order document, capped at 100. Payments can be backdated.
+Order total is just the subtotal, so there is no tax, no discounts, and no currency other than USD. Line items live on the order document and are capped at 100. Payments can be backdated.
 
 ## Before production
 
-Refunds and CSV export are the gaps — both stretch goals I skipped to keep the payment path solid. An append-only audit log would be first in. After that: pagination and search on the list, rate limiting on the payment endpoint, structured logs, and a reconciliation job that re-derives paid totals from payments and alerts on drift.
+Refunds and CSV export aren't built. Both were optional and I put the time into the payment path instead.
+
+If I kept going, an append-only audit log of status changes is the first thing I'd add, since anything touching money should be able to answer who changed what and when. After that: pagination and search on the order list, rate limiting on the payment endpoint, structured request logs, and a job that re-derives paid totals from the payments collection and alerts if anything has drifted.
