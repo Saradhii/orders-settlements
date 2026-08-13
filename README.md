@@ -4,7 +4,7 @@ Create orders with line items, record full or partial payments against them, and
 
 Live: https://orders-settlements-weld.vercel.app
 
-Demo account: `demo@example.com` / `demo12345`
+Demo account: `demo@example.com` / `demo12345` — sign in at https://orders-settlements-weld.vercel.app/login
 
 Next.js (App Router) and TypeScript, MongoDB via the native driver, Better Auth for email/password, Zod for validation, Tailwind and shadcn/ui, Vitest for tests.
 
